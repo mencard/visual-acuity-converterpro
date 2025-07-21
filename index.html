@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Visual Acuity Converter</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f0f0f0; }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 700px; margin: auto; background-color: #f0f0f0; }
     h1 { color: #222; }
     label, input, select, button { display: block; margin: 10px 0; width: 100%; }
     input, select { padding: 8px; }
@@ -17,88 +17,143 @@
 <body>
   <h1>Visual Acuity Converter</h1>
 
-  <label for="inputType">Select input type</label>
-  <select id="inputType">
-    <option value="snellen">Snellen (e.g., 2.5/200)</option>
-    <option value="logmar">logMAR (e.g., 0.3)</option>
-    <option value="decimal">Decimal (e.g., 0.5)</option>
-    <option value="mar">MAR (e.g., 2.0)</option>
+  <label for="modeSelector">Select Mode</label>
+  <select id="modeSelector" onchange="toggleMode()">
+    <option value="standard">Standard Conversion</option>
+    <option value="teller">Teller Acuity Cards</option>
   </select>
 
-  <label for="visionInput">Enter visual acuity value</label>
-  <input type="text" id="visionInput" placeholder="e.g., 2.5/200 or 0.3">
+  <div id="standardSection">
+    <label for="inputType">Select input type</label>
+    <select id="inputType">
+      <option value="snellen">Snellen (e.g., 2.5/200)</option>
+      <option value="logmar">logMAR (e.g., 0.3)</option>
+      <option value="decimal">Decimal (e.g., 0.5)</option>
+      <option value="mar">MAR (e.g., 2.0)</option>
+    </select>
 
-  <label for="lettersInput">Letters additionally read (+) or missed (−)</label>
-  <input type="number" id="lettersInput" placeholder="e.g., -2 or +1">
+    <label for="visionInput">Enter visual acuity value</label>
+    <input type="text" id="visionInput" placeholder="e.g., 2.5/200 or 0.3">
+
+    <label for="lettersInput">Letters additionally read (+) or missed (−)</label>
+    <input type="number" id="lettersInput" placeholder="e.g., -2 or +1">
+  </div>
+
+  <div id="tellerSection" style="display:none">
+    <label for="ageInput">Patient age (months)</label>
+    <input type="number" id="ageInput" placeholder="e.g., 12">
+
+    <label for="distanceInput">Test distance</label>
+    <select id="distanceInput">
+      <option value="38">38 cm</option>
+      <option value="55">55 cm</option>
+      <option value="84">84 cm</option>
+    </select>
+
+    <label for="cpdInput">Cycles per degree (cpd)</label>
+    <input type="number" step="0.1" id="cpdInput" placeholder="e.g., 4.8">
+  </div>
 
   <button onclick="convertAcuity()">Convert</button>
-
   <div class="result" id="result" style="display: none;"></div>
 
   <script>
-    function classifyICD10(decimal) {
-      if (decimal >= 0.3) return "Normal vision – equal to or better than 20/60 (≥ 0.3)";
-      if (decimal >= 0.1) return "Mild visual impairment – less than 20/60 to 20/200 (0.1–0.29)";
-      if (decimal >= 0.05) return "Moderate visual impairment – less than 20/200 to 20/400 (0.05–0.09)";
-      if (decimal >= 0.02) return "Severe visual impairment – less than 20/400 to 20/1000 (0.02–0.049)";
-      if (decimal >= 0.01) return "Profound visual impairment – less than 20/1000 to 20/2000 (0.01–0.019)";
-      return "Near total blindness – less than 20/2000 (< 0.01)";
+    const tellerNorms = {
+      38: {1: 1, 2: 2, 4: 4, 6: 6, 12: 7.5, 18: 10, 24: 15, 36: 20, 48: 30},
+      55: {1: 1.2, 2: 2.3, 4: 4.5, 6: 6.5, 12: 8.5, 18: 11, 24: 16, 36: 22, 48: 32},
+      84: {1: 1.5, 2: 2.5, 4: 5, 6: 7, 12: 9, 18: 13, 24: 18, 36: 25, 48: 36}
+    };
+
+    function toggleMode() {
+      const mode = document.getElementById('modeSelector').value;
+      document.getElementById('standardSection').style.display = mode === 'standard' ? 'block' : 'none';
+      document.getElementById('tellerSection').style.display = mode === 'teller' ? 'block' : 'none';
+      document.getElementById('result').style.display = 'none';
     }
 
     function convertAcuity() {
+      const mode = document.getElementById('modeSelector').value;
+      const resultDiv = document.getElementById('result');
+
+      if (mode === 'teller') {
+        const age = parseInt(document.getElementById('ageInput').value);
+        const dist = parseInt(document.getElementById('distanceInput').value);
+        const cpd = parseFloat(document.getElementById('cpdInput').value);
+        if (!age || !cpd || !dist) {
+          resultDiv.innerHTML = "Please fill in all Teller fields correctly.";
+          resultDiv.style.display = 'block';
+          return;
+        }
+        const norm = tellerNorms[dist];
+        const closestAge = Object.keys(norm).reduce((a, b) => Math.abs(b - age) < Math.abs(a - age) ? b : a);
+        const expected = norm[closestAge];
+        const snellen = `20/${Math.round(600 / cpd)}`;
+        const decimal = cpd / 30;
+        const logMAR = -(Math.log10(decimal));
+
+        resultDiv.innerHTML = `
+          <strong>Teller Acuity Result:</strong><br>
+          • Expected ≥ ${expected.toFixed(1)} cpd for age ${closestAge} months<br>
+          • Measured: ${cpd.toFixed(1)} cpd<br>
+          • Status: ${cpd >= expected ? '✅ Within normal range' : '❌ Below expected'}<br><br>
+          <strong>Approximate Equivalents:</strong><br>
+          • Snellen (20 ft): ${snellen}<br>
+          • Decimal: ${decimal.toFixed(2)}<br>
+          • logMAR: ${logMAR.toFixed(2)}<br>
+          <em>*Approximated values. Grating acuity may overestimate recognition acuity.*</em>
+        `;
+        resultDiv.style.display = 'block';
+        return;
+      }
+
       const inputType = document.getElementById('inputType').value;
       const input = document.getElementById('visionInput').value.trim().replace(',', '.');
       const extraLetters = parseInt(document.getElementById('lettersInput').value) || 0;
-      const resultDiv = document.getElementById('result');
-
       let decimal, logMAR, MAR, snellen20, snellen6;
 
       if (inputType === 'snellen') {
         const parts = input.split('/');
-        if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
+        if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
           resultDiv.innerHTML = "Please enter a valid Snellen value (e.g., 2.5/200).";
           resultDiv.style.display = 'block';
           return;
         }
-        const numerator = parseFloat(parts[0]);
-        const denominator = parseFloat(parts[1]);
-        decimal = numerator / denominator;
-        logMAR = -(Math.log10(decimal));
-        logMAR += extraLetters * 0.02;
+        decimal = parseFloat(parts[0]) / parseFloat(parts[1]);
+        logMAR = -Math.log10(decimal) + extraLetters * 0.02;
       } else if (inputType === 'logmar') {
-        logMAR = parseFloat(input);
-        if (isNaN(logMAR)) {
-          resultDiv.innerHTML = "Please enter a valid logMAR value (e.g., 0.3).";
-          resultDiv.style.display = 'block';
-          return;
-        }
-        logMAR += extraLetters * 0.02;
+        logMAR = parseFloat(input) + extraLetters * 0.02;
         decimal = Math.pow(10, -logMAR);
       } else if (inputType === 'decimal') {
         decimal = parseFloat(input);
-        if (isNaN(decimal) || decimal <= 0) {
-          resultDiv.innerHTML = "Please enter a valid decimal value (e.g., 0.5).";
-          resultDiv.style.display = 'block';
-          return;
-        }
-        logMAR = -(Math.log10(decimal));
-        logMAR += extraLetters * 0.02;
+        logMAR = -Math.log10(decimal) + extraLetters * 0.02;
       } else if (inputType === 'mar') {
         MAR = parseFloat(input);
-        if (isNaN(MAR) || MAR <= 0) {
-          resultDiv.innerHTML = "Please enter a valid MAR value (e.g., 2.0).";
-          resultDiv.style.display = 'block';
-          return;
-        }
         decimal = 1 / MAR;
-        logMAR = -(Math.log10(decimal));
-        logMAR += extraLetters * 0.02;
+        logMAR = -Math.log10(decimal) + extraLetters * 0.02;
       }
 
       MAR = (1 / decimal).toFixed(2);
       snellen20 = `20/${Math.round(20 / decimal)}`;
       snellen6 = `6/${Math.round(6 / decimal)}`;
-      const classification = classifyICD10(decimal);
+
+      let classification = "";
+      let aids = "";
+      if (decimal >= 0.3) {
+        classification = "Mild visual impairment – ≥20/70 (≥0.3)";
+        aids = "May not need aids or may benefit from near additions.";
+      } else if (decimal >= 0.1) {
+        classification = "Moderate visual impairment – 20/200 to 20/70 (0.05–0.3)";
+        aids = "Magnifiers ~3× to 6×, low-power telescopes.";
+      } else if (decimal >= 0.05) {
+        classification = "Severe visual impairment – 20/400 to 20/200 (0.02–0.05)";
+        aids = "Magnifiers 6× to 10×, stand magnifiers, high-add lenses.";
+      } else if (decimal > 0.01) {
+        classification = "Profound visual impairment – <20/400 to LP (0.005–0.02)";
+        aids = "Electronic magnifiers, tactile tools, screen readers.";
+      } else {
+        classification = "Near total blindness – NLP to LP (<0.005)";
+        aids = "Tactile aids, Braille, orientation and mobility training.";
+      }
 
       resultDiv.innerHTML = `
         <strong>Conversion Results:</strong><br>
@@ -108,8 +163,11 @@
         • Snellen (20 ft): ${snellen20}<br>
         • Snellen (6 m): ${snellen6}<br>
         • Extra letters: ${extraLetters > 0 ? '+' + extraLetters : extraLetters}<br><br>
-        <strong>ICD-10 Visual Classification:</strong><br>
-        • ${classification}
+        <strong>ICD-10 Classification:</strong><br>
+        • ${classification}<br><br>
+        <strong>Recommended Aids:</strong><br>
+        • ${aids}<br>
+        <em><a href=\"#\" onclick=\"alert('Sources: WHO ICD-10, AAO, CBO, Pan-American guidelines')\">View sources</a></em>
       `;
       resultDiv.style.display = 'block';
     }
