@@ -7,8 +7,8 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; background-color: #f0f0f0; }
     h1 { color: #222; }
-    label, input, button { display: block; margin: 10px 0; width: 100%; }
-    input { padding: 8px; }
+    label, input, select, button { display: block; margin: 10px 0; width: 100%; }
+    input, select { padding: 8px; }
     button { padding: 10px; background-color: #007BFF; color: white; border: none; border-radius: 4px; cursor: pointer; }
     button:hover { background-color: #0056b3; }
     .result { background: #fff; padding: 15px; border-radius: 8px; margin-top: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
@@ -16,8 +16,17 @@
 </head>
 <body>
   <h1>Visual Acuity Converter</h1>
-  <label for="visionInput">Enter visual acuity (Snellen format, e.g., 2.5/200)</label>
-  <input type="text" id="visionInput" placeholder="e.g., 2.5/200">
+
+  <label for="inputType">Select input type</label>
+  <select id="inputType">
+    <option value="snellen">Snellen (e.g., 2.5/200)</option>
+    <option value="logmar">logMAR (e.g., 0.3)</option>
+    <option value="decimal">Decimal (e.g., 0.5)</option>
+    <option value="mar">MAR (e.g., 2.0)</option>
+  </select>
+
+  <label for="visionInput">Enter visual acuity value</label>
+  <input type="text" id="visionInput" placeholder="e.g., 2.5/200 or 0.3">
 
   <label for="lettersInput">Letters additionally read (+) or missed (−)</label>
   <input type="number" id="lettersInput" placeholder="e.g., -2 or +1">
@@ -28,27 +37,58 @@
 
   <script>
     function convertAcuity() {
-      const input = document.getElementById('visionInput').value.trim();
+      const inputType = document.getElementById('inputType').value;
+      const input = document.getElementById('visionInput').value.trim().replace(',', '.');
       const extraLetters = parseInt(document.getElementById('lettersInput').value) || 0;
       const resultDiv = document.getElementById('result');
 
-      const parts = input.split('/');
-      if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
-        resultDiv.innerHTML = "Please enter a valid Snellen value (e.g., 2.5/200).";
-        resultDiv.style.display = 'block';
-        return;
+      let decimal, logMAR, MAR, snellen20, snellen6;
+
+      if (inputType === 'snellen') {
+        const parts = input.split('/');
+        if (parts.length !== 2 || isNaN(parseFloat(parts[0])) || isNaN(parseFloat(parts[1]))) {
+          resultDiv.innerHTML = "Please enter a valid Snellen value (e.g., 2.5/200).";
+          resultDiv.style.display = 'block';
+          return;
+        }
+        const numerator = parseFloat(parts[0]);
+        const denominator = parseFloat(parts[1]);
+        decimal = numerator / denominator;
+        logMAR = -(Math.log10(decimal));
+        logMAR += extraLetters * 0.02;
+      } else if (inputType === 'logmar') {
+        logMAR = parseFloat(input);
+        if (isNaN(logMAR)) {
+          resultDiv.innerHTML = "Please enter a valid logMAR value (e.g., 0.3).";
+          resultDiv.style.display = 'block';
+          return;
+        }
+        logMAR += extraLetters * 0.02;
+        decimal = Math.pow(10, -logMAR);
+      } else if (inputType === 'decimal') {
+        decimal = parseFloat(input);
+        if (isNaN(decimal) || decimal <= 0) {
+          resultDiv.innerHTML = "Please enter a valid decimal value (e.g., 0.5).";
+          resultDiv.style.display = 'block';
+          return;
+        }
+        logMAR = -(Math.log10(decimal));
+        logMAR += extraLetters * 0.02;
+      } else if (inputType === 'mar') {
+        MAR = parseFloat(input);
+        if (isNaN(MAR) || MAR <= 0) {
+          resultDiv.innerHTML = "Please enter a valid MAR value (e.g., 2.0).";
+          resultDiv.style.display = 'block';
+          return;
+        }
+        decimal = 1 / MAR;
+        logMAR = -(Math.log10(decimal));
+        logMAR += extraLetters * 0.02;
       }
 
-      const numerator = parseFloat(parts[0].replace(',', '.'));
-      const denominator = parseFloat(parts[1].replace(',', '.'));
-
-      const decimal = numerator / denominator;
-      let logMAR = -(Math.log10(decimal));
-      logMAR += extraLetters * 0.02;
-
-      const MAR = (1 / decimal).toFixed(2);
-      const snellen20 = `20/${Math.round((denominator * 20) / numerator)}`;
-      const snellen6 = `6/${Math.round((denominator * 6) / numerator)}`;
+      MAR = (1 / decimal).toFixed(2);
+      snellen20 = `20/${Math.round(20 / decimal)}`;
+      snellen6 = `6/${Math.round(6 / decimal)}`;
 
       resultDiv.innerHTML = `
         <strong>Conversion Results:</strong><br>
