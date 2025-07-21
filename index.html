@@ -36,6 +36,15 @@
   <div class="result" id="result" style="display: none;"></div>
 
   <script>
+    function classifyICD10(decimal) {
+      if (decimal >= 0.3) return "Normal vision – equal to or better than 20/60 (≥ 0.3)";
+      if (decimal >= 0.1) return "Mild visual impairment – less than 20/60 to 20/200 (0.1–0.29)";
+      if (decimal >= 0.05) return "Moderate visual impairment – less than 20/200 to 20/400 (0.05–0.09)";
+      if (decimal >= 0.02) return "Severe visual impairment – less than 20/400 to 20/1000 (0.02–0.049)";
+      if (decimal >= 0.01) return "Profound visual impairment – less than 20/1000 to 20/2000 (0.01–0.019)";
+      return "Near total blindness – less than 20/2000 (< 0.01)";
+    }
+
     function convertAcuity() {
       const inputType = document.getElementById('inputType').value;
       const input = document.getElementById('visionInput').value.trim().replace(',', '.');
@@ -89,6 +98,7 @@
       MAR = (1 / decimal).toFixed(2);
       snellen20 = `20/${Math.round(20 / decimal)}`;
       snellen6 = `6/${Math.round(6 / decimal)}`;
+      const classification = classifyICD10(decimal);
 
       resultDiv.innerHTML = `
         <strong>Conversion Results:</strong><br>
@@ -97,7 +107,9 @@
         • MAR: ${MAR}<br>
         • Snellen (20 ft): ${snellen20}<br>
         • Snellen (6 m): ${snellen6}<br>
-        • Extra letters: ${extraLetters > 0 ? '+' + extraLetters : extraLetters}
+        • Extra letters: ${extraLetters > 0 ? '+' + extraLetters : extraLetters}<br><br>
+        <strong>ICD-10 Visual Classification:</strong><br>
+        • ${classification}
       `;
       resultDiv.style.display = 'block';
     }
